@@ -1,0 +1,108 @@
+import math
+import png
+
+class Vector(): #Three componet vector utility class, used to reperesnt ray casts and normals
+    def __init__(self,  x , y , z ):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __str__(self):
+        return str(self.x) + "," + str(self.y) + ","+ str(self.z)
+
+    def dot_product(self, other):
+        return (self.x * other.x + self.y * other.y + self.z * other.z)
+
+    def magnitude(self):
+        return math.sqrt(self.dot_product(self))
+
+    def __add__(self, other):
+        return Vector(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other):
+        return Vector(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    def __mul__(self, other):
+        return Vector(self.x * other.x, self.y * other.y, self.z * other.z)
+
+    def __rmul__(self, other):
+        return Vector(self.x * other.x, self.y * other.y, self.z * other.z)
+
+    def __truediv__(self, other):
+        return Vector(self.x / other.x, self.y / other.y, self.z / other.z)
+
+    def normalize(self):
+        size = self.magnitude()
+        return Vector(self.x/size, self.y/size, self.z/size)
+
+class Sphere(): #Used to represnt spheres that rays intersect into
+    def __init__(self, radius, center = Vector( 5, 5, 5), color = None):
+        self.radius = radius
+        self.center = center
+        self.color = color
+    def intersection(self, orgin, direction): 
+        a = Vector.dot_product(direction, direction)
+        b = 2 * Vector.dot_product(direction, orgin - self.center)
+        c = Vector.dot_product(orgin - self.center, orgin - self.center) - self.radius**2
+        discrem = b**2 - 4*a*c #checks to see if an interseciton even has to be worried about without wasting time doing the full quadradic formula
+        if discrem < 0:
+            return (False, None)
+        else:
+            t1 = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
+            t2 = (-b - math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
+            if t1 and t2: #if the "ray" hits 2 points on the sphere, the only one drawn will be the one closest to the point of view
+                return (True, min(t1, t2))
+            if t1:
+                return (True, t1)
+            else:
+                return (True, t2)
+
+def color_sphere_intersect_screen(eye, sphere, scale, light): #Generates the raster and writes it to a png
+    s = []
+    for i in range(-scale, scale): #loops through each pixel with the other for loop on line 74
+        z = []
+        x = ((i + 0.5) * 11) / scale #determies size of each pixel
+        for j in range(-scale, scale):
+            y = ((j + 0.5) * 11) / scale #determines size of each pixel
+            dirct = Vector(x, y , 0) - eye #direction of the vector between the pixel and the camera
+            if not sphere.intersection(eye, dirct.normalize())[0]: #if the vector being shot from the eye to the sphere does not hit, just draw a black pixel because the sphere does not exist
+                z.append(255)
+                z.append(255)
+                z.append(255)
+            else:
+                z.append(0)
+                pixel = 0
+                for l in range(len(light)): #loops through all the lights given
+                    if sphere.intersection(light[l],dirct.normalize())[1] == None or 255 - 12*sphere.intersection(light[l], dirct.normalize())[1] < 0 or 255 - 12*sphere.intersection(light[l], dirct.normalize())[1] > 255: #checks to make sure that the light also hits the pixel that the eye sees
+                        pass
+                    else:
+                        pixel += int(255-12*float(sphere.intersection(light[l], dirct.normalize())[1])) #determines the color of the pixel 
+                if pixel > 255: # overflow in the green parameter for a pixel goes into the red and blue pixel parameters to make the pixel brighter due to more light 
+                    z[j+1] = pixel-255
+                    pixel = 255
+                    z.append(pixel)
+                    z.append(z[j+1])
+                else:
+                    z.append(pixel)
+                    z.append(0)
+        s.append(z)
+
+    f = open("raytrace.png", "wb")
+    w = png.Writer(scale*2,scale*2, greyscale=False)
+    w.write(f,s)
+    f.close()
+
+
+def main():
+
+
+    eye = Vector( 0, 0, -10)
+    light = [Vector(5,5,-10),Vector(10,0,-10)]
+    sphere = Sphere(25, Vector(0,0,25))
+    light2 = Vector(0,5,-10)
+    scale = 500 #dimension of the raster being produced
+    color_sphere_intersect_screen(eye, sphere, scale, light)
+
+
+if __name__ == '__main__':
+    main()
